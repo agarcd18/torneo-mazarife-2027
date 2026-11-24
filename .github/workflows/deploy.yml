@@ -19,7 +19,7 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Instalar dependencias
@@ -32,11 +32,10 @@ jobs:
         run: npm run build
 
       - name: Subir artefacto a Pages
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: ./dist
 
       - name: Publicar en GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-    
