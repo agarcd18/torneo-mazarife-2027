@@ -3,6 +3,7 @@ import { backend, BackendUser, RealtimeStatus, SyncError } from './backend';
 import type { DB, TournamentPhoto } from './types';
 import { Op, applyChange, applyOp, applyOps, invertOps } from './ops';
 import { buildView, View } from '../domain/view';
+import { saveEmergencySnapshot } from '../domain/backup';
 
 export type SyncState = 'synced' | 'saving' | 'offline' | 'error';
 export interface Toast {
@@ -187,7 +188,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           break;
         }
         setNetDown(false);
-        setRemote((prev) => (prev ? applyOp(prev, o) : prev));
+        setRemote((prev) => {
+          if (!prev) return prev;
+          const updated = applyOp(prev, o);
+          saveEmergencySnapshot(updated);
+          return updated;
+        });
         setQueue(queueRef.current.filter((x) => x.opId !== o.opId));
       }
     } finally {

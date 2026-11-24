@@ -3488,3 +3488,90 @@ textarea {
   text-transform: uppercase;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
+
+
+/* ==========================================================================
+   SISTEMA DE COPIAS DE SEGURIDAD Y RESTAURACIÓN XL (BACKUP / RESTORE)
+   ========================================================================== */
+.backup-master-card {
+  background: linear-gradient(155deg, rgba(18, 52, 36, 0.96), rgba(8, 22, 16, 0.98));
+  border: 2px solid var(--gold);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.backup-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 560px) {
+  .backup-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.backup-xl-btn {
+  min-height: 62px;
+  font-size: 17px;
+  text-align: center;
+}
+
+.backup-preview-box {
+  background: rgba(0, 0, 0, 0.34);
+  border: 2px solid var(--gold);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.backup-confirm-text {
+  font-size: 18px;
+  margin: 10px 0 8px;
+  color: #ffffff;
+}
+
+.backup-progress-bar {
+  background: rgba(255, 210, 63, 0.2);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.backup-success-banner {
+  background: rgba(57, 230, 130, 0.18);
+  border: 2px solid var(--green-bright);
+  color: #8affb8;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-weight: 800;
+  margin: 12px 0;
+}
+
+.backup-secondary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 560px) {
+  .backup-secondary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.backup-sub-box {
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
