@@ -155,15 +155,22 @@ export function Banners() {
   const s = useStore();
   return (
     <>
-      {s.loadError && s.view && (
+      {(s.mode === 'demo' || (s.loadError && !s.fresh)) && (
+        <div className="banner banner-db-critical" role="alert">
+          ⚠️ SIN CONEXIÓN A BASE DE DATOS - LOS CAMBIOS NO SE GUARDARÁN EN LA NUBE
+        </div>
+      )}
+      {s.mode === 'supabase' && s.loadError && s.fresh && (
         <div className="banner banner-warn">
-          Sin conexión con el servidor; mostrando datos guardados. Reintentando…
+          ⚠️ Conexión inestable con Supabase; mostrando datos sincronizados y reintentando en segundo plano…
         </div>
       )}
       {s.flushError && s.isOrganizer && (
         <div className="banner banner-err">
-          No se pudo guardar un cambio: {s.flushError}{' '}
-          <a href="#/admin/ajustes">Revisar</a>
+          ❌ Error al guardar en Supabase: {s.flushError}{' '}
+          <a href="#/admin/ajustes" style={{ textDecoration: 'underline', fontWeight: 800 }}>
+            Revisar cola
+          </a>
         </div>
       )}
     </>

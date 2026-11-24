@@ -3475,3 +3475,16 @@ textarea {
   font-size: 20px;
   margin-top: 8px;
 }
+
+
+.banner-db-critical {
+  background: #c0392b;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  padding: 14px 16px;
+  border-bottom: 3px solid var(--gold);
+  text-transform: uppercase;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}

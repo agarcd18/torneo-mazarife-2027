@@ -82,6 +82,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Copia local de la base de datos (último estado bueno conocido). Solo se usa para mostrar.
   const [remote, setRemote] = useState<DB | null>(() => loadJSON<DB | null>(CKEY, null));
   const [fresh, setFresh] = useState(false);
+  const freshRef = useRef(false);
+  freshRef.current = fresh;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -312,6 +314,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (ops: Op[], label: string, opts?: { undoable?: boolean }) => {
       const cur = dbRef.current;
       if (!cur || !ops.length) return;
+      // Garantía anti-sobrescritura al arrancar:
+      // Si estamos conectados a Supabase pero aún no ha respondido la primera lectura real del servidor,
+      // bloqueamos cualquier escritura para no pisar datos de la nube con un estado inicial o caché antigua.
+      if (backend.mode === 'supabase' && !freshRef.current) {
+        toast('⏳ Esperando a recibir los datos actuales de Supabase antes de guardar…', 'warn');
+        load();
+        return;
+      }
       if (opts?.undoable !== false) {
         const inv = invertOps(cur, ops);
         undoRef.current = [...undoRef.current.slice(-49), { label, ops: inv }];
@@ -320,7 +330,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const ts = Date.now();
       setQueue([...queueRef.current, ...ops.map((o) => ({ ...o, label, ts }))]);
     },
-    [setQueue],
+    [setQueue, toast, load],
   );
 
   const undo = useCallback(() => {

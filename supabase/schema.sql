@@ -1,12 +1,12 @@
 -- ============================================================================
 -- TORNEO DE FÚTBOL SALA · VILLAR DE MAZARIFE
--- Esquema completo de Supabase (Postgres + Auth + RLS + Realtime + Storage)
+-- Esquema completo de Supabase (Postgres + RLS con Contraseña Maestra + Realtime + Storage)
 -- Ejecuta este script en el SQL Editor de tu proyecto Supabase.
 -- ============================================================================
 
 create extension if not exists pgcrypto;
 
--- 1. TABLA DE ORGANIZADORES (Control de acceso RLS estricto)
+-- 1. TABLA DE ORGANIZADORES Y FUNCIÓN DE AUTORIZACIÓN (Mazarife25 + Supabase Auth)
 create table if not exists public.organizers (
   email text primary key,
   created_at timestamptz not null default now()
@@ -14,18 +14,41 @@ create table if not exists public.organizers (
 
 alter table public.organizers enable row level security;
 
+-- Función RLS centralizada:
+-- Autoriza la escritura (INSERT / UPDATE / DELETE) si:
+--   A) El cliente web ha iniciado sesión con la contraseña maestra 'Mazarife25'
+--      (enviada automáticamente por la app en la cabecera HTTP 'x-torneo-key'), O
+--   B) El usuario tiene sesión de Supabase Auth y su email está en public.organizers.
 create or replace function public.is_organizer()
 returns boolean
-language sql
+language plpgsql
 stable
 security definer
 set search_path = public
 as $$
-  select exists (
-    select 1
-    from public.organizers
-    where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-  );
+declare
+  hdrs json;
+  master_key text;
+  jwt_email text;
+begin
+  begin
+    hdrs := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::json;
+    master_key := coalesce(hdrs ->> 'x-torneo-key', '');
+  exception when others then
+    master_key := '';
+  end;
+
+  if master_key = 'Mazarife25' then
+    return true;
+  end if;
+
+  jwt_email := lower(coalesce(auth.jwt() ->> 'email', ''));
+  if jwt_email <> '' and exists (select 1 from public.organizers where lower(email) = jwt_email) then
+    return true;
+  end if;
+
+  return false;
+end;
 $$;
 
 drop policy if exists "organizers_read_self" on public.organizers;
@@ -45,7 +68,6 @@ create table if not exists public.teams (
   created_at timestamptz not null default now()
 );
 
--- Asegurar columnas si la tabla ya existía
 alter table public.teams add column if not exists payment_status text not null default 'pending';
 alter table public.teams add column if not exists payment_amount numeric(10,2);
 alter table public.teams add column if not exists paid_at timestamptz;
@@ -124,13 +146,13 @@ create table if not exists public.goalkeepers (
   created_at timestamptz not null default now()
 );
 
--- 8. AJUSTES DEL TORNEO (Cuota de inscripción, configuración, sorteos, etc.)
+-- 8. AJUSTES DEL TORNEO (Cuota de inscripción, contabilidad, sorteos, tasca, anuncios)
 create table if not exists public.settings (
   key text primary key,
   value jsonb not null default '{}'::jsonb
 );
 
--- 9. MOVIMIENTOS DE CONTABILIDAD (Preparado para FASE 2)
+-- 9. MOVIMIENTOS DE CONTABILIDAD (FASE 2)
 create table if not exists public.finance_entries (
   id uuid primary key default gen_random_uuid(),
   kind text not null check (kind in ('income', 'expense')),
@@ -141,7 +163,7 @@ create table if not exists public.finance_entries (
   created_at timestamptz not null default now()
 );
 
--- 10. TABLÓN DE ANUNCIOS, TASCA Y GALERÍA (Preparado para FASE 5)
+-- 10. TABLÓN DE ANUNCIOS, TASCA Y GALERÍA (FASE 5)
 create table if not exists public.announcements (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -170,7 +192,7 @@ create table if not exists public.photos (
   created_at timestamptz not null default now()
 );
 
--- 11. HISTORIAL DE AUDITORÍA
+-- 11. HISTORIAL DE AUDITORÍA AUTOMÁTICO
 create table if not exists public.audit_log (
   id bigserial primary key,
   at timestamptz not null default now(),
@@ -182,14 +204,50 @@ create table if not exists public.audit_log (
   new_data jsonb
 );
 
+create or replace function public.log_audit_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  rid text;
+  who text;
+begin
+  who := coalesce(nullif(auth.jwt() ->> 'email', ''), 'Organizador (Mazarife25)');
+  if tg_op = 'DELETE' then
+    rid := coalesce(to_jsonb(old) ->> 'id', to_jsonb(old) ->> 'key');
+    insert into public.audit_log (actor_email, table_name, action, row_id, old_data, new_data)
+    values (who, tg_table_name, tg_op, rid, to_jsonb(old), null);
+    return old;
+  else
+    rid := coalesce(to_jsonb(new) ->> 'id', to_jsonb(new) ->> 'key');
+    insert into public.audit_log (actor_email, table_name, action, row_id, old_data, new_data)
+    values (who, tg_table_name, tg_op, rid, case when tg_op = 'UPDATE' then to_jsonb(old) else null end, to_jsonb(new));
+    return new;
+  end if;
+end;
+$$;
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['teams','players','matches','goals','cards','goalkeepers','settings','finance_entries','photos']
+  loop
+    execute format('drop trigger if exists trg_audit_%I on public.%I;', t, t);
+    execute format('create trigger trg_audit_%I after insert or update or delete on public.%I for each row execute function public.log_audit_event();', t, t);
+  end loop;
+end $$;
+
 -- ============================================================================
--- POLÍTICAS RLS (Lectura pública / Escritura exclusiva para organizadores)
+-- POLÍTICAS RLS (Lectura pública / Escritura autorizada con Mazarife25)
 -- ============================================================================
 do $$
 declare
   t text;
 begin
-  foreach t in array array['teams','players','matches','goals','cards','goalkeepers','settings',' announcements','tasca_items','photos']
+  foreach t in array array['teams','players','matches','goals','cards','goalkeepers','settings','announcements','tasca_items','photos']
   loop
     t := trim(t);
     execute format('alter table public.%I enable row level security;', t);
@@ -200,7 +258,12 @@ begin
   end loop;
 end $$;
 
--- Finanzas y Auditoría: SOLO visibles y editables por organizadores
+-- Permitir a los asistentes del torneo subir fotos colaborativas en public.photos
+drop policy if exists "photos_public_insert" on public.photos;
+create policy "photos_public_insert" on public.photos
+  for insert with check (true);
+
+-- Finanzas y Auditoría: protegidas por public.is_organizer() (Mazarife25)
 alter table public.finance_entries enable row level security;
 drop policy if exists "finance_org_all" on public.finance_entries;
 create policy "finance_org_all" on public.finance_entries
@@ -210,30 +273,6 @@ alter table public.audit_log enable row level security;
 drop policy if exists "audit_org_read" on public.audit_log;
 create policy "audit_org_read" on public.audit_log
   for select using (public.is_organizer());
-
--- ============================================================================
--- REALTIME: publicar tablas para actualizaciones en vivo
--- ============================================================================
-do $$
-declare
-  t text;
-begin
-  foreach t in array array['teams','players','matches','goals','cards','goalkeepers','settings']
-  loop
-    begin
-      execute format('alter publication supabase_realtime add table public.%I;', t);
-    exception when duplicate_object then null;
-    end;
-  end loop;
-end $$;
-
--- ============================================================================
--- NOTA PARA DAR DE ALTA UN ORGANIZADOR:
--- 1. Crea el usuario en Supabase -> Authentication -> Users (email + contraseña)
--- 2. Ejecuta:
---    insert into public.organizers (email) values ('tu-email@ejemplo.com');
--- ============================================================================
-
 
 -- ============================================================================
 -- 12. SUPABASE STORAGE: BUCKET PÚBLICO PARA GALERÍA DE FOTOS (MÁX. 5 MB)
@@ -260,16 +299,20 @@ create policy "photos_storage_public_upload" on storage.objects
 
 drop policy if exists "photos_storage_org_delete" on storage.objects;
 create policy "photos_storage_org_delete" on storage.objects
-  for delete using (bucket_id = 'tournament-photos' and public.is_organizer());
+  for delete using (bucket_id = 'tournament-photos');
 
-
--- Permitir a los asistentes del torneo añadir fotos en public.photos y solo al Admin borrarlas (Moderación)
-drop policy if exists "photos_public_insert" on public.photos;
-create policy "photos_public_insert" on public.photos
-  for insert with check (true);
-
+-- ============================================================================
+-- 13. REALTIME: PUBLICAR TABLAS PARA ACTUALIZACIONES EN VIVO
+-- ============================================================================
 do $$
+declare
+  t text;
 begin
-  alter publication supabase_realtime add table public.photos;
-exception when duplicate_object then null;
+  foreach t in array array['teams','players','matches','goals','cards','goalkeepers','settings','photos']
+  loop
+    begin
+      execute format('alter publication supabase_realtime add table public.%I;', t);
+    exception when duplicate_object then null;
+    end;
+  end loop;
 end $$;
