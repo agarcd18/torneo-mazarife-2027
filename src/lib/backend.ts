@@ -398,8 +398,8 @@ function createDemoBackend(): Backend {
   };
 }
 
-const URL_ = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
-const KEY_ = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '').trim();
+const URL_ = (import.meta.env.VITE_SUPABASE_URL || 'https://gvqgqlbdjjsnkcywibhy.supabase.co').trim();
+const KEY_ = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_tJlH5joYt_G08Nq9D_LgJA_xsKCEAq0').trim();
 const hasValidCredentials =
   URL_.startsWith('https://') &&
   !URL_.includes('TU-PROYECTO') &&
