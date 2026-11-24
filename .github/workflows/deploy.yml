@@ -3,6 +3,7 @@ name: Desplegar Torneo en GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,7 +14,7 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Descargar código
+      - name: Descargar codigo
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
@@ -25,7 +26,7 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Compilar aplicación
+      - name: Compilar aplicacion
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -34,6 +35,7 @@ jobs:
       - name: Subir artefacto a Pages
         uses: actions/upload-pages-artifact@v4
         with:
+          name: github-pages
           path: ./dist
 
       - name: Publicar en GitHub Pages
