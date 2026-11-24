@@ -1,0 +1,18 @@
+{
+  "name": "Torneo de Fútbol Sala · Villar de Mazarife",
+  "short_name": "Futsal Villar",
+  "description": "PWA oficial del Torneo de Verano de Fútbol Sala de Villar de Mazarife",
+  "lang": "es",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#07140f",
+  "theme_color": "#07140f",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
